@@ -188,7 +188,7 @@ export default function Dashboard() {
   const leadsGagnes     = leads.filter(l => l.statut === 'Gagné').length
   const txConversion    = leadsTotal > 0 ? Math.round((leadsGagnes / leadsTotal) * 100) : 0
 
-  const prenom = profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] || 'toi'
+  const prenom = profile?.full_name?.split(' ')[0] || profile?.nom?.split(' ')[0] || 'toi'
   const { text: greetText } = greeting()
 
   // ── Today's tasks count (for motivational message)
