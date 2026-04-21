@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useEmailStore } from '@/stores/emailStore'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
 import { getAvatarUrl } from '@/utils/avatar'
 import {
   Send, Plus, Trash2, Inbox, Mail, Search,
@@ -303,11 +304,20 @@ export default function Emails() {
   const [showCompose, setShowCompose] = useState(false)
   const [composeTarget, setComposeTarget] = useState({ email: '', name: '', clientId: null as string | null })
   const threadEndRef = useRef<HTMLDivElement>(null)
+  const [refreshToken, setRefreshToken] = useState('')
 
-  const refreshToken = profile?.branding?.gmailRefreshToken ?? ''
-  const fromEmail    = profile?.branding?.gmailEmail        ?? ''
-  const fromName     = profile?.branding?.gmailName         ?? profile?.nom ?? ''
+  const fromEmail    = profile?.branding?.gmailEmail ?? ''
+  const fromName     = profile?.branding?.gmailName  ?? profile?.nom ?? ''
   const isConfigured = !!(refreshToken && fromEmail)
+
+  // Charger le token depuis la table sécurisée (non exposée publiquement)
+  useEffect(() => {
+    const loadToken = async () => {
+      const { data } = await supabase.from('user_tokens').select('gmail_refresh_token').single()
+      if (data?.gmail_refresh_token) setRefreshToken(data.gmail_refresh_token)
+    }
+    loadToken()
+  }, [])
 
   useEffect(() => {
     if (!isConfigured) return
@@ -376,7 +386,9 @@ export default function Emails() {
             </button>
             <button
               onClick={async () => {
-                await updateProfile({ branding: { ...(profile?.branding ?? {}), gmailRefreshToken: '', gmailEmail: '', gmailName: '' } })
+                await supabase.from('user_tokens').update({ gmail_refresh_token: null, gmail_email: null, gmail_name: null }).eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+                await updateProfile({ branding: { ...(profile?.branding ?? {}), gmailEmail: '', gmailName: '' } })
+                setRefreshToken('')
               }}
               className="w-9 h-9 flex items-center justify-center rounded-xl btn-ghost"
               title="Déconnecter Gmail"

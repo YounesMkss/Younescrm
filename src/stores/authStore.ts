@@ -213,40 +213,32 @@ export const useAuthStore = create<AuthState>()(
       acceptInvitation: async (token) => {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user
-        if (!user) {
-          console.error('[acceptInvitation] pas de session')
-          return { error: 'Non authentifié' }
-        }
+        if (!user) return { error: 'Non authentifié' }
 
-        console.log('[acceptInvitation] token:', token, '| user:', user.id)
-
-        // Chercher l'invitation — sans filtre status pour voir si elle existe même acceptée
         const { data: invite, error: fetchError } = await supabase
           .from('invitations')
           .select('*')
           .eq('token', token)
+          .eq('status', 'pending')
           .single()
 
-        console.log('[acceptInvitation] invitation:', invite, '| fetchError:', fetchError)
+        if (fetchError || !invite) return { error: 'Invitation introuvable ou expirée' }
 
-        if (fetchError || !invite) return { error: 'Invitation introuvable' }
-        if (invite.status !== 'pending') {
-          // Déjà acceptée — on recrée quand même la relation au cas où
-          console.warn('[acceptInvitation] invitation déjà acceptée, on recrée la relation')
+        // Vérifier que l'invitation est bien destinée à cet utilisateur
+        const userEmail = user.email?.toLowerCase().trim()
+        const inviteEmail = invite.to_email?.toLowerCase().trim()
+        if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
+          return { error: 'Cette invitation ne vous est pas destinée' }
         }
 
-        // Créer la relation workspace_member
         const { error: memberError } = await supabase
           .from('workspace_members')
           .insert({ owner_id: invite.from_user_id, member_id: user.id, role: 'Membre' })
-
-        console.log('[acceptInvitation] insert workspace_members:', memberError ?? 'OK')
 
         if (memberError && !memberError.message.includes('duplicate')) {
           return { error: memberError.message }
         }
 
-        // Marquer comme acceptée
         await supabase
           .from('invitations')
           .update({ status: 'accepted' })

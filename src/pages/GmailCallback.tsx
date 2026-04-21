@@ -47,10 +47,18 @@ export default function GmailCallback() {
         })
         const userInfo = await profileRes.json()
 
-        // Save tokens to profile branding
+        // Store token in secure table (not visible to other users)
+        await supabase.from('user_tokens').upsert({
+          user_id: session?.user?.id,
+          gmail_refresh_token: json.refresh_token,
+          gmail_email: userInfo.email ?? '',
+          gmail_name: userInfo.name ?? '',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+        // Only store non-sensitive info in profile branding
         const branding = {
           ...(profile?.branding ?? {}),
-          gmailRefreshToken: json.refresh_token,
           gmailEmail: userInfo.email ?? '',
           gmailName: userInfo.name ?? '',
         }
